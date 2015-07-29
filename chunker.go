@@ -1,6 +1,7 @@
 package chunker
 
 import (
+	"bytes"
 	"errors"
 	"hash"
 	"io"
@@ -12,17 +13,12 @@ const (
 	MiB = 1024 * KiB
 
 	// WindowSize is the size of the sliding window.
-	windowSize = 64
-
-	// aim to create chunks of 20 bits or about 1MiB on average.
-	averageBits = 20
+	windowSize = 16
 
 	// MinSize is the minimal size of a chunk.
-	MinSize = 512 * KiB
+	MinSize = 128 * KiB
 	// MaxSize is the maximal size of a chunk.
-	MaxSize = 8 * MiB
-
-	splitmask = (1 << averageBits) - 1
+	MaxSize = 512 * KiB
 
 	chunkerBufSize = 512 * KiB
 )
@@ -53,6 +49,7 @@ type Chunk struct {
 	Length uint
 	Cut    uint64
 	Digest []byte
+	Data   []byte
 }
 
 func (c Chunk) Reader(r io.ReaderAt) io.Reader {
@@ -67,6 +64,8 @@ type Chunker struct {
 
 	rd     io.Reader
 	closed bool
+
+	chunkbuf *bytes.Buffer
 
 	window [windowSize]byte
 	wpos   int
@@ -83,16 +82,20 @@ type Chunker struct {
 
 	digest uint64
 	h      hash.Hash
+
+	chunkSize uint64
 }
 
 // New returns a new Chunker based on polynomial p that reads from rd
 // with bufsize and pass all data to hash along the way.
-func New(rd io.Reader, pol Pol, h hash.Hash) *Chunker {
+func New(rd io.Reader, pol Pol, h hash.Hash, sizepow uint) *Chunker {
 	c := &Chunker{
-		buf: bufPool.Get().([]byte),
-		h:   h,
-		pol: pol,
-		rd:  rd,
+		buf:       bufPool.Get().([]byte),
+		h:         h,
+		pol:       pol,
+		rd:        rd,
+		chunkbuf:  new(bytes.Buffer),
+		chunkSize: (1 << sizepow) - 1,
 	}
 
 	c.reset()
@@ -190,6 +193,7 @@ func (c *Chunker) Next() (*Chunk, error) {
 	for {
 		if c.bpos >= c.bmax {
 			n, err := io.ReadFull(c.rd, c.buf[:])
+			c.chunkbuf.Write(c.buf[:n])
 
 			if err == io.ErrUnexpectedEOF {
 				err = nil
@@ -206,6 +210,7 @@ func (c *Chunker) Next() (*Chunk, error) {
 				// return the buffer to the pool
 				bufPool.Put(c.buf)
 
+				data := dupBytes(c.chunkbuf.Next(int(c.count)))
 				// return current chunk, if any bytes have been processed
 				if c.count > 0 {
 					return &Chunk{
@@ -213,6 +218,7 @@ func (c *Chunker) Next() (*Chunk, error) {
 						Length: c.count,
 						Cut:    c.digest,
 						Digest: c.hashDigest(),
+						Data:   data,
 					}, nil
 				}
 			}
@@ -268,18 +274,21 @@ func (c *Chunker) Next() (*Chunk, error) {
 				continue
 			}
 
-			if (c.digest&splitmask) == 0 || add >= MaxSize {
+			if (c.digest&c.chunkSize) == 0 || add >= MaxSize {
 				i := add - c.count - 1
 				c.updateHash(c.buf[c.bpos : c.bpos+uint(i)+1])
 				c.count = add
 				c.pos += uint(i) + 1
 				c.bpos += uint(i) + 1
 
+				data := dupBytes(c.chunkbuf.Next(int(c.count)))
+
 				chunk := &Chunk{
 					Start:  c.start,
 					Length: c.count,
 					Cut:    c.digest,
 					Digest: c.hashDigest(),
+					Data:   data,
 				}
 
 				c.reset()
@@ -296,6 +305,12 @@ func (c *Chunker) Next() (*Chunk, error) {
 		c.pos += steps
 		c.bpos = c.bmax
 	}
+}
+
+func dupBytes(b []byte) []byte {
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
 }
 
 func (c *Chunker) updateHash(data []byte) {
