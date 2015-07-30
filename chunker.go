@@ -5,6 +5,7 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"math"
 	"sync"
 )
 
@@ -14,11 +15,6 @@ const (
 
 	// WindowSize is the size of the sliding window.
 	windowSize = 16
-
-	// MinSize is the minimal size of a chunk.
-	MinSize = 128 * KiB
-	// MaxSize is the maximal size of a chunk.
-	MaxSize = 512 * KiB
 
 	chunkerBufSize = 512 * KiB
 )
@@ -45,8 +41,8 @@ func init() {
 // Chunk is one content-dependent chunk of bytes whose end was cut when the
 // Rabin Fingerprint had the value stored in Cut.
 type Chunk struct {
-	Start  uint
-	Length uint
+	Start  uint64
+	Length uint64
 	Cut    uint64
 	Digest []byte
 	Data   []byte
@@ -59,7 +55,7 @@ func (c Chunk) Reader(r io.ReaderAt) io.Reader {
 // Chunker splits content with Rabin Fingerprints.
 type Chunker struct {
 	pol      Pol
-	polShift uint
+	polShift uint64
 	tables   *tables
 
 	rd     io.Reader
@@ -71,31 +67,41 @@ type Chunker struct {
 	wpos   int
 
 	buf  []byte
-	bpos uint
-	bmax uint
+	bpos uint64
+	bmax uint64
 
-	start uint
-	count uint
-	pos   uint
+	start uint64
+	count uint64
+	pos   uint64
 
-	pre uint // wait for this many bytes before start calculating an new chunk
+	pre uint64 // wait for this many bytes before start calculating an new chunk
 
 	digest uint64
 	h      hash.Hash
 
-	chunkSize uint64
+	sizeMask uint64
+
+	// minimal and maximal size of the outputted blocks
+	MinSize uint64
+	MaxSize uint64
 }
 
 // New returns a new Chunker based on polynomial p that reads from rd
 // with bufsize and pass all data to hash along the way.
-func New(rd io.Reader, pol Pol, h hash.Hash, sizepow uint) *Chunker {
+func New(rd io.Reader, pol Pol, h hash.Hash, avSize uint64) *Chunker {
+
+	sizepow := uint(math.Log2(float64(avSize)))
+
 	c := &Chunker{
-		buf:       bufPool.Get().([]byte),
-		h:         h,
-		pol:       pol,
-		rd:        rd,
-		chunkbuf:  new(bytes.Buffer),
-		chunkSize: (1 << sizepow) - 1,
+		buf:      bufPool.Get().([]byte),
+		h:        h,
+		pol:      pol,
+		rd:       rd,
+		chunkbuf: new(bytes.Buffer),
+		sizeMask: (1 << sizepow) - 1,
+
+		MinSize: avSize / 2,
+		MaxSize: avSize + (avSize / 2),
 	}
 
 	c.reset()
@@ -104,7 +110,7 @@ func New(rd io.Reader, pol Pol, h hash.Hash, sizepow uint) *Chunker {
 }
 
 func (c *Chunker) reset() {
-	c.polShift = uint(c.pol.Deg() - 8)
+	c.polShift = uint64(c.pol.Deg() - 8)
 	c.fillTables()
 
 	for i := 0; i < windowSize; i++ {
@@ -123,7 +129,7 @@ func (c *Chunker) reset() {
 	}
 
 	// do not start a new chunk unless at least MinSize bytes have been read
-	c.pre = MinSize - windowSize
+	c.pre = c.MinSize - windowSize
 }
 
 // Calculate out_table and mod_table for optimization. Must be called only
@@ -177,7 +183,7 @@ func (c *Chunker) fillTables() {
 		// two parts: Part A contains the result of the modulus operation, part
 		// B is used to cancel out the 8 top bits so that one XOR operation is
 		// enough to reduce modulo Polynomial
-		c.tables.mod[b] = Pol(uint64(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k))
+		c.tables.mod[b] = Pol(uint64(b)<<uint64(k)).Mod(c.pol) | (Pol(b) << uint64(k))
 	}
 }
 
@@ -228,18 +234,18 @@ func (c *Chunker) Next() (*Chunk, error) {
 			}
 
 			c.bpos = 0
-			c.bmax = uint(n)
+			c.bmax = uint64(n)
 		}
 
 		// check if bytes have to be dismissed before starting a new chunk
 		if c.pre > 0 {
 			n := c.bmax - c.bpos
-			if c.pre > uint(n) {
-				c.pre -= uint(n)
+			if c.pre > uint64(n) {
+				c.pre -= uint64(n)
 				c.updateHash(c.buf[c.bpos:c.bmax])
 
-				c.count += uint(n)
-				c.pos += uint(n)
+				c.count += uint64(n)
+				c.pos += uint64(n)
 				c.bpos = c.bmax
 
 				continue
@@ -270,16 +276,16 @@ func (c *Chunker) Next() (*Chunk, error) {
 			// end inline
 
 			add++
-			if add < MinSize {
+			if add < c.MinSize {
 				continue
 			}
 
-			if (c.digest&c.chunkSize) == 0 || add >= MaxSize {
+			if (c.digest&c.sizeMask) == 0 || add >= c.MaxSize {
 				i := add - c.count - 1
-				c.updateHash(c.buf[c.bpos : c.bpos+uint(i)+1])
+				c.updateHash(c.buf[c.bpos : c.bpos+uint64(i)+1])
 				c.count = add
-				c.pos += uint(i) + 1
-				c.bpos += uint(i) + 1
+				c.pos += uint64(i) + 1
+				c.bpos += uint64(i) + 1
 
 				data := dupBytes(c.chunkbuf.Next(int(c.count)))
 
