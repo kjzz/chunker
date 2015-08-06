@@ -1,7 +1,6 @@
 package chunker
 
 import (
-	"bytes"
 	"errors"
 	"hash"
 	"io"
@@ -61,7 +60,7 @@ type Chunker struct {
 	rd     io.Reader
 	closed bool
 
-	chunkbuf *bytes.Buffer
+	chunkbuf []byte
 
 	window [windowSize]byte
 	wpos   int
@@ -88,7 +87,7 @@ type Chunker struct {
 
 // New returns a new Chunker based on polynomial p that reads from rd
 // with bufsize and pass all data to hash along the way.
-func New(rd io.Reader, pol Pol, h hash.Hash, avSize uint64) *Chunker {
+func New(rd io.Reader, pol Pol, h hash.Hash, avSize, min, max uint64) *Chunker {
 
 	sizepow := uint(math.Log2(float64(avSize)))
 
@@ -97,11 +96,11 @@ func New(rd io.Reader, pol Pol, h hash.Hash, avSize uint64) *Chunker {
 		h:        h,
 		pol:      pol,
 		rd:       rd,
-		chunkbuf: new(bytes.Buffer),
+		chunkbuf: make([]byte, 0, max),
 		sizeMask: (1 << sizepow) - 1,
 
-		MinSize: avSize / 2,
-		MaxSize: avSize + (avSize / 2),
+		MinSize: min,
+		MaxSize: max,
 	}
 
 	c.reset()
@@ -187,6 +186,14 @@ func (c *Chunker) fillTables() {
 	}
 }
 
+func (c *Chunker) nextBytes() []byte {
+	data := dupBytes(c.chunkbuf[:c.count])
+	n := copy(c.chunkbuf, c.chunkbuf[c.count:])
+	c.chunkbuf = c.chunkbuf[:n]
+
+	return data
+}
+
 // Next returns the position and length of the next chunk of data. If an error
 // occurs while reading, the error is returned with a nil chunk. The state of
 // the current chunk is undefined. When the last chunk has been returned, all
@@ -199,7 +206,7 @@ func (c *Chunker) Next() (*Chunk, error) {
 	for {
 		if c.bpos >= c.bmax {
 			n, err := io.ReadFull(c.rd, c.buf[:])
-			c.chunkbuf.Write(c.buf[:n])
+			c.chunkbuf = append(c.chunkbuf, c.buf[:n]...)
 
 			if err == io.ErrUnexpectedEOF {
 				err = nil
@@ -216,7 +223,8 @@ func (c *Chunker) Next() (*Chunk, error) {
 				// return the buffer to the pool
 				bufPool.Put(c.buf)
 
-				data := dupBytes(c.chunkbuf.Next(int(c.count)))
+				data := c.nextBytes()
+
 				// return current chunk, if any bytes have been processed
 				if c.count > 0 {
 					return &Chunk{
@@ -287,7 +295,7 @@ func (c *Chunker) Next() (*Chunk, error) {
 				c.pos += uint64(i) + 1
 				c.bpos += uint64(i) + 1
 
-				data := dupBytes(c.chunkbuf.Next(int(c.count)))
+				data := c.nextBytes()
 
 				chunk := &Chunk{
 					Start:  c.start,
