@@ -12,8 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/restic/chunker"
-	. "github.com/restic/restic/test"
+	chunker "github.com/whyrusleeping/chunker"
 )
 
 func parseDigest(s string) []byte {
@@ -26,7 +25,7 @@ func parseDigest(s string) []byte {
 }
 
 type chunk struct {
-	Length uint
+	Length uint64
 	CutFP  uint64
 	Digest []byte
 }
@@ -41,29 +40,28 @@ const testPol = chunker.Pol(0x3DA3358B4DC173)
 // window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
 // polynom 0x3DA3358B4DC173
 var chunks1 = []chunk{
-	chunk{2163460, 0x000b98d4cdf00000, parseDigest("4b94cb2cf293855ea43bf766731c74969b91aa6bf3c078719aabdd19860d590d")},
-	chunk{643703, 0x000d4e8364d00000, parseDigest("5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407")},
-	chunk{1528956, 0x0015a25c2ef00000, parseDigest("a73759636a1e7a2758767791c69e81b69fb49236c6929e5d1b654e06e37674ba")},
-	chunk{1955808, 0x00102a8242e00000, parseDigest("c955fb059409b25f07e5ae09defbbc2aadf117c97a3724e06ad4abd2787e6824")},
-	chunk{2222372, 0x00045da878000000, parseDigest("6ba5e9f7e1b310722be3627716cf469be941f7f3e39a4c3bcefea492ec31ee56")},
-	chunk{2538687, 0x00198a8179900000, parseDigest("8687937412f654b5cfe4a82b08f28393a0c040f77c6f95e26742c2fc4254bfde")},
-	chunk{609606, 0x001d4e8d17100000, parseDigest("5da820742ff5feb3369112938d3095785487456f65a8efc4b96dac4be7ebb259")},
-	chunk{1205738, 0x000a7204dd600000, parseDigest("cc70d8fad5472beb031b1aca356bcab86c7368f40faa24fe5f8922c6c268c299")},
-	chunk{959742, 0x00183e71e1400000, parseDigest("4065bdd778f95676c92b38ac265d361f81bff17d76e5d9452cf985a2ea5a4e39")},
-	chunk{4036109, 0x001fec043c700000, parseDigest("b9cf166e75200eb4993fc9b6e22300a6790c75e6b0fc8f3f29b68a752d42f275")},
-	chunk{1525894, 0x000b1574b1500000, parseDigest("2f238180e4ca1f7520a05f3d6059233926341090f9236ce677690c1823eccab3")},
-	chunk{1352720, 0x00018965f2e00000, parseDigest("afd12f13286a3901430de816e62b85cc62468c059295ce5888b76b3af9028d84")},
-	chunk{811884, 0x00155628aa100000, parseDigest("42d0cdb1ee7c48e552705d18e061abb70ae7957027db8ae8db37ec756472a70a")},
-	chunk{1282314, 0x001909a0a1400000, parseDigest("819721c2457426eb4f4c7565050c44c32076a56fa9b4515a1c7796441730eb58")},
-	chunk{1318021, 0x001cceb980000000, parseDigest("842eb53543db55bacac5e25cb91e43cc2e310fe5f9acc1aee86bdf5e91389374")},
-	chunk{948640, 0x0011f7a470a00000, parseDigest("b8e36bf7019bb96ac3fb7867659d2167d9d3b3148c09fe0de45850b8fe577185")},
-	chunk{645464, 0x00030ce2d9400000, parseDigest("5584bd27982191c3329f01ed846bfd266e96548dfa87018f745c33cfc240211d")},
-	chunk{533758, 0x0004435c53c00000, parseDigest("4da778a25b72a9a0d53529eccfe2e5865a789116cb1800f470d8df685a8ab05d")},
-	chunk{1128303, 0x0000c48517800000, parseDigest("08c6b0b38095b348d80300f0be4c5184d2744a17147c2cba5cc4315abf4c048f")},
-	chunk{800374, 0x000968473f900000, parseDigest("820284d2c8fd243429674c996d8eb8d3450cbc32421f43113e980f516282c7bf")},
-	chunk{2453512, 0x001e197c92600000, parseDigest("5fa870ed107c67704258e5e50abe67509fb73562caf77caa843b5f243425d853")},
-	chunk{2651975, 0x000ae6c868000000, parseDigest("181347d2bbec32bef77ad5e9001e6af80f6abcf3576549384d334ee00c1988d8")},
-	chunk{237392, 0x0000000000000001, parseDigest("fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978")},
+	chunk{1579758, 0x001d06f777d00000, parseDigest("2931d6dff887a8597b333fd13fcade3ee0c11ad747c5a0eb5ebe7f9d86ab4e42")},
+	chunk{1089328, 0x001c99190f500000, parseDigest("c8a84f85953a2bfbc5555d43e570f5ffa8ca7f0db3a2bc6e47f9e5da06130313")},
+	chunk{614316, 0x0002e95018f00000, parseDigest("2f99d99fd70f6bcbe01a945c81a5bb355ea8d82a368c82b6bbd57c81df0173db")},
+	chunk{1183251, 0x00187291a9d00000, parseDigest("56db29489e7b8f81e9076d451db131a2501264452509ec5dd2732c5ca3d043da")},
+	chunk{2079238, 0x00150d9af0e00000, parseDigest("9cd438ed06933b4d3e1ccbfef9e5b26d3e98171c557ed56a841d20d6b31cc1bb")},
+	chunk{1282082, 0x0001d7df88a00000, parseDigest("63284dafb2da8040f01ee8c68e431d0e5c63fbc4c94e72826af3bbf9458edfee")},
+	chunk{1656779, 0x001881427eb00000, parseDigest("31b07bddd5d4baf0c7a9d77e66b5134595a4b57ed9e10864dbae9a6cc8511361")},
+	chunk{1053264, 0x0006e8249a400000, parseDigest("b630ea907fcae93b3b2da07de81d885eadb44b5a61e9d8d34d256c42acd54faf")},
+	chunk{1028060, 0x00179e806ee00000, parseDigest("f91c9aa5ad51515ba9d2b22b88ce6064a5bca7d11a6233d641aaf4226b26f991")},
+	chunk{896166, 0x001a90cfa7900000, parseDigest("b3b0faf1476b77ae20aecec498faa99d8743b6057d99cb35f8b8f3e178970f32")},
+	chunk{1633016, 0x001c77ba2dc00000, parseDigest("7dfc1baf511bb19d003d7fde2718296681133a51995b4b7497381b4c7551f0ff")},
+	chunk{1051769, 0x001c7ee3e8900000, parseDigest("e5cd24f70553b4cec0ff26e756a634d374c50280b21ed199d7dcc6f6c9d5b185")},
+	chunk{5719810, 0x00004e5c0ca00000, parseDigest("21b576c8340813e1a3b517b5727ed256e3a13a060fa3b5a2b05279fc625dddce")},
+	chunk{2490321, 0x0014eedcd5900000, parseDigest("47adb6a6cbf2ecfe18e1b90f03b19f8155bb7222d5ca264698c1f94666224043")},
+	chunk{544210, 0x00063fcba2b00000, parseDigest("2a55f181b50a2af4efa85e2cb43479980490519537b85b945238cea33d682233")},
+	chunk{892726, 0x000b6da997300000, parseDigest("10c413cd7eddfd4d5577984cc137fe25d59b357fe282aa4d6b085482eefc1127")},
+	chunk{1147747, 0x000745edc1700000, parseDigest("c39a798ca1516b0bf41a925de18bc225df2c51078d0c5330a4230c0919c64a32")},
+	chunk{1964963, 0x000a609a0f900000, parseDigest("e44ad9856707b191144ee597b845f8253906c3e1b4112cc28c49bf196e5f5be7")},
+	chunk{798928, 0x000ed5aa9e200000, parseDigest("7bb618d427aa47512c414a682496e861c81c905deac8434fc55c1caf34655501")},
+	chunk{2585098, 0x00108d5fd0500000, parseDigest("678291ddd056c63af055f206bf59c4e773036e2f67564edd3c159729586d1275")},
+	chunk{975521, 0x000603e82f500000, parseDigest("faa1244cca467335cd3c04e4a9f9c2d72fa49b7e9d6c6392a68923d1372a16c0")},
+	chunk{1288081, 0x00097e6e5e2e0920, parseDigest("857eab0067640c83275d628d2f22c027855afd8aa816bb1f15e6233d19fa8cea")},
 }
 
 // test if nullbytes are correctly split, even if length is a multiple of MinSize.
@@ -77,7 +75,7 @@ var chunks2 = []chunk{
 func testWithData(t *testing.T, chnker *chunker.Chunker, testChunks []chunk) []*chunker.Chunk {
 	chunks := []*chunker.Chunk{}
 
-	pos := uint(0)
+	pos := uint64(0)
 	for i, chunk := range testChunks {
 		c, err := chnker.Next()
 
@@ -146,7 +144,7 @@ func getRandom(seed, count int) []byte {
 func TestChunker(t *testing.T) {
 	// setup data source
 	buf := getRandom(23, 32*1024*1024)
-	ch := chunker.New(bytes.NewReader(buf), testPol, sha256.New())
+	ch := chunker.New(bytes.NewReader(buf), testPol, sha256.New(), chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 	chunks := testWithData(t, ch, chunks1)
 
 	// test reader
@@ -159,7 +157,7 @@ func TestChunker(t *testing.T) {
 			t.Fatalf("io.Copy(): %v", err)
 		}
 
-		if uint(n) != chunks1[i].Length {
+		if uint64(n) != chunks1[i].Length {
 			t.Fatalf("reader returned wrong number of bytes: expected %d, got %d",
 				chunks1[i].Length, n)
 		}
@@ -173,7 +171,7 @@ func TestChunker(t *testing.T) {
 
 	// setup nullbyte data source
 	buf = bytes.Repeat([]byte{0}, len(chunks2)*chunker.MinSize)
-	ch = chunker.New(bytes.NewReader(buf), testPol, sha256.New())
+	ch = chunker.New(bytes.NewReader(buf), testPol, sha256.New(), chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 
 	testWithData(t, ch, chunks2)
 }
@@ -185,29 +183,35 @@ func TestChunkerWithRandomPolynomial(t *testing.T) {
 	// generate a new random polynomial
 	start := time.Now()
 	p, err := chunker.RandomPolynomial()
-	OK(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("generating random polynomial took %v", time.Since(start))
 
 	start = time.Now()
-	ch := chunker.New(bytes.NewReader(buf), p, sha256.New())
+	ch := chunker.New(bytes.NewReader(buf), p, sha256.New(), chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 	t.Logf("creating chunker took %v", time.Since(start))
 
 	// make sure that first chunk is different
 	c, err := ch.Next()
 
-	Assert(t, c.Cut != chunks1[0].CutFP,
-		"Cut point is the same")
-	Assert(t, c.Length != chunks1[0].Length,
-		"Length is the same")
-	Assert(t, !bytes.Equal(c.Digest, chunks1[0].Digest),
-		"Digest is the same")
+	if c.Cut == chunks1[0].CutFP {
+		t.Fatal("Cut point is the same")
+	}
+	if c.Length == chunks1[0].Length {
+		t.Fatal("Length is the same")
+	}
+	if bytes.Equal(c.Digest, chunks1[0].Digest) {
+		t.Fatal("Digest is the same")
+	}
+
 }
 
 func TestChunkerWithoutHash(t *testing.T) {
 	// setup data source
 	buf := getRandom(23, 32*1024*1024)
 
-	ch := chunker.New(bytes.NewReader(buf), testPol, nil)
+	ch := chunker.New(bytes.NewReader(buf), testPol, nil, chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 	chunks := testWithData(t, ch, chunks1)
 
 	// test reader
@@ -219,12 +223,12 @@ func TestChunkerWithoutHash(t *testing.T) {
 			t.Fatalf("io.Copy(): %v", err)
 		}
 
-		if uint(len(buf2)) != chunks1[i].Length {
+		if uint64(len(buf2)) != chunks1[i].Length {
 			t.Fatalf("reader returned wrong number of bytes: expected %d, got %d",
 				chunks1[i].Length, uint(len(buf2)))
 		}
 
-		if uint(len(buf2)) != chunks1[i].Length {
+		if uint64(len(buf2)) != chunks1[i].Length {
 			t.Fatalf("wrong number of bytes returned: expected %02x, got %02x",
 				chunks[i].Length, len(buf2))
 		}
@@ -237,7 +241,7 @@ func TestChunkerWithoutHash(t *testing.T) {
 
 	// setup nullbyte data source
 	buf = bytes.Repeat([]byte{0}, len(chunks2)*chunker.MinSize)
-	ch = chunker.New(bytes.NewReader(buf), testPol, sha256.New())
+	ch = chunker.New(bytes.NewReader(buf), testPol, sha256.New(), chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 
 	testWithData(t, ch, chunks2)
 }
@@ -254,7 +258,7 @@ func benchmarkChunker(b *testing.B, hash hash.Hash) {
 		chunks = 0
 
 		rd.Seek(0, 0)
-		ch := chunker.New(rd, testPol, hash)
+		ch := chunker.New(rd, testPol, hash, chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 
 		for {
 			_, err := ch.Next()
@@ -288,11 +292,13 @@ func BenchmarkChunker(b *testing.B) {
 
 func BenchmarkNewChunker(b *testing.B) {
 	p, err := chunker.RandomPolynomial()
-	OK(b, err)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		chunker.New(bytes.NewBuffer(nil), p, nil)
+		chunker.New(bytes.NewBuffer(nil), p, nil, chunker.AvgSize, chunker.MinSize, chunker.MaxSize)
 	}
 }

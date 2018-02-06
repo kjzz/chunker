@@ -16,6 +16,14 @@ const (
 	windowSize = 16
 
 	chunkerBufSize = 512 * KiB
+
+	// MinSize is the default minimal size of a chunk.
+	MinSize = 512 * KiB
+	// MaxSize is the default maximal size of a chunk.
+	MaxSize = 8 * MiB
+
+	// AvgSize is the default average size of a chunk.
+	AvgSize = 1048576
 )
 
 var bufPool = sync.Pool{
