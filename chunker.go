@@ -27,7 +27,7 @@ const (
 )
 
 var bufPool = sync.Pool{
-	New: func() interface{} { return make([]byte, chunkerBufSize) },
+	New: func() interface{} { return new([chunkerBufSize]byte) },
 }
 
 type tables struct {
@@ -73,7 +73,7 @@ type Chunker struct {
 	window [windowSize]byte
 	wpos   int
 
-	buf  []byte
+	buf  *[chunkerBufSize]byte
 	bpos uint64
 	bmax uint64
 
@@ -100,7 +100,7 @@ func New(rd io.Reader, pol Pol, h hash.Hash, avSize, min, max uint64) *Chunker {
 	sizepow := uint(math.Log2(float64(avSize)))
 
 	c := &Chunker{
-		buf:      bufPool.Get().([]byte),
+		buf:      bufPool.Get().(*[chunkerBufSize]byte),
 		h:        h,
 		pol:      pol,
 		rd:       rd,
@@ -207,6 +207,10 @@ func (c *Chunker) nextBytes() []byte {
 // the current chunk is undefined. When the last chunk has been returned, all
 // subsequent calls yield a nil chunk and an io.EOF error.
 func (c *Chunker) Next() (*Chunk, error) {
+	if c.closed {
+		return nil, io.EOF
+	}
+
 	if c.tables == nil {
 		return nil, errors.New("polynomial is not set")
 	}
@@ -229,7 +233,9 @@ func (c *Chunker) Next() (*Chunk, error) {
 				c.closed = true
 
 				// return the buffer to the pool
-				bufPool.Put(c.buf)
+				buf := c.buf
+				c.buf = nil
+				bufPool.Put(buf)
 
 				data := c.nextBytes()
 
