@@ -27,7 +27,7 @@ const (
 )
 
 var bufPool = sync.Pool{
-	New: func() interface{} { return make([]byte, chunkerBufSize) },
+	New: func() interface{} { return new([chunkerBufSize]byte) },
 }
 
 type tables struct {
@@ -73,7 +73,7 @@ type Chunker struct {
 	window [windowSize]byte
 	wpos   int
 
-	buf  []byte
+	buf  *[chunkerBufSize]byte
 	bpos uint64
 	bmax uint64
 
@@ -100,7 +100,7 @@ func New(rd io.Reader, pol Pol, h hash.Hash, avSize, min, max uint64) *Chunker {
 	sizepow := uint(math.Log2(float64(avSize)))
 
 	c := &Chunker{
-		buf:      bufPool.Get().([]byte),
+		buf:      bufPool.Get().(*[chunkerBufSize]byte),
 		h:        h,
 		pol:      pol,
 		rd:       rd,
