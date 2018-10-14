@@ -207,6 +207,10 @@ func (c *Chunker) nextBytes() []byte {
 // the current chunk is undefined. When the last chunk has been returned, all
 // subsequent calls yield a nil chunk and an io.EOF error.
 func (c *Chunker) Next() (*Chunk, error) {
+	if c.closed {
+		return nil, io.EOF
+	}
+
 	if c.tables == nil {
 		return nil, errors.New("polynomial is not set")
 	}
@@ -229,7 +233,9 @@ func (c *Chunker) Next() (*Chunk, error) {
 				c.closed = true
 
 				// return the buffer to the pool
-				bufPool.Put(c.buf)
+				buf := c.buf
+				c.buf = nil
+				bufPool.Put(buf)
 
 				data := c.nextBytes()
 
